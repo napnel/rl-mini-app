@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+    <head>
+        <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+        <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+    </head>
+
+    <body>
+        <py-config>
+            packages = ["numpy", "gymnasium"]
+            [[files]]
+            files = [
+                "test.py"
+            ]
+        </py-config>
+        <py-script>
+            import sys
+            display(sys.version)
+        </py-script>
+        <py-script src="run_cartpole.py"></py-script>
+        <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort.js"></script>
+        <script src="inference.js"></script>
+        <script>
+            let session;
+            const modelPath = "rl/policy_model/model.onnx"
+            async function js_init_session(model_path)
+            {
+                display("Loading model: " + model_path)
+                session = await ort.InferenceSession.create(model_path, {executionProviders: ['wasm']});
+                try {
+                    console.log("warming up");
+                    const input = new Float32Array(1 * 1 * 28 * 28);
+                    const output = await session.run({ "input": input });
+                }
+                catch (e) {
+                    console.log(e);
+                }
+                return session;
+            }
+
+            async function js_run_session(session, input)
+            {
+                const output = await session.run({ "input": input });
+                return output;
+            }
+        </script>
+        <!-- <py-repl auto-generate="true"></py-repl> -->
+        <!-- <script src="test.js" defer></script> -->
+    </body>
+</html>
