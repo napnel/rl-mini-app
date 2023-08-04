@@ -60,6 +60,7 @@
             <h3 id="message"></h3>
             <button id="reset-button" class="hidden" py-click="reset()">Again</button>
         </div>
+
         <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
         <script>
             const model_path = "policy_model/model.onnx"
@@ -92,7 +93,6 @@
             [[fetch]]
             files = [
                 "rl/envs.py",
-                "front/main.py"
             ]
         </py-config>
         <py-script>
@@ -140,26 +140,25 @@ def reset():
 
 def update_cells(state):
     for i, value in enumerate(state):
-        Element(f"pos-{i}-x").add_class("hidden")
         Element(f"pos-{i}-o").add_class("hidden")
+        Element(f"pos-{i}-x").add_class("hidden")
         Element(f"pos-{i}-button").remove_class("hidden")
         if value == Mark.PLAYER_1:
-            Element(f"pos-{i}-x").remove_class("hidden")
+            Element(f"pos-{i}-o").remove_class("hidden")
             Element(f"pos-{i}-button").add_class("hidden")
         elif value == Mark.PLAYER_2:
-            Element(f"pos-{i}-o").remove_class("hidden")
+            Element(f"pos-{i}-x").remove_class("hidden")
             Element(f"pos-{i}-button").add_class("hidden")
 
 def display_message(message):
     Element("message").write(message)
 
+click_proxy = create_proxy(click_cell)
 for i in range(9):
-    document.getElementById(f"pos-{i}-button").addEventListener('click', create_proxy(click_cell))
+    document.getElementById(f"pos-{i}-button").addEventListener('click', click_proxy)
 
-env = TicTacToeEnv()
+env = TicTacToeEnv(env_config={"train": False})
 reset()
         </py-script>
-        <!-- <py-repl auto-generate="true"></py-repl> -->
-        <!-- <script src="test.js" defer></script> -->
     </body>
 </html>
