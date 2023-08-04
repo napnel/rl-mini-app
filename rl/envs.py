@@ -23,11 +23,18 @@ class TicTacToeEnv(gym.Env):
         self.state = [Mark.EMPTY for _ in range(9)]
 
         self.current_player = Mark.PLAYER_1
+        self.train = env_config.get("train", True)
 
     def reset(self, seed=None, options=None):
         # Reset the state of the environment to an initial state
         self.state = [Mark.EMPTY for _ in range(9)]
+        # Todo: Randomly select the first player
+
         self.current_player = Mark.PLAYER_1
+        if self.train:
+            action = np.random.choice(np.where(np.array(self.state) == Mark.EMPTY)[0])
+            self.step(action)
+
         return self.state, {}
 
     def step(self, action):
@@ -37,20 +44,31 @@ class TicTacToeEnv(gym.Env):
             self.state[action] = self.current_player
 
             terminated = self.check_game_status()
-
-            if terminated:
-                reward = 1 if self.current_player == Mark.PLAYER_1 else -1
+            if terminated == Mark.PLAYER_1:  # Player
+                reward = -1
+            elif terminated == Mark.PLAYER_2:  # Agent
+                reward = 1
+            elif terminated == -1:  # Draw
+                reward = 0
             else:
                 reward = 0
+
                 # Switch the current player
                 self.current_player = (
                     Mark.PLAYER_1
                     if self.current_player == Mark.PLAYER_2
                     else Mark.PLAYER_2
                 )
+
+            terminated = bool(abs(terminated) > 0)
+
         else:
             terminated = True
             reward = -1
+
+        if self.train and self.current_player == Mark.PLAYER_2 and not terminated:
+            action = np.random.choice(np.where(np.array(self.state) == Mark.EMPTY)[0])
+            return self.step(action)
 
         return self.state, reward, terminated, truncated, {}
 
@@ -66,12 +84,17 @@ class TicTacToeEnv(gym.Env):
             self.state[0:9:4],
             self.state[2:7:2],  # diagonal lines
         ]
-        if [1, 1, 1] in lines or [2, 2, 2] in lines:
-            return True  # a player wins
-        elif 0 not in self.state:
-            return True  # draw
+        if [Mark.PLAYER_1, Mark.PLAYER_1, Mark.PLAYER_1] in lines:
+            return Mark.PLAYER_1
+
+        elif [Mark.PLAYER_2, Mark.PLAYER_2, Mark.PLAYER_2] in lines:
+            return Mark.PLAYER_2
+
+        elif Mark.EMPTY not in self.state:
+            return -1
+
         else:
-            return False  # game continues
+            return 0
 
 
 # class OthelloEnv(gym.Env):

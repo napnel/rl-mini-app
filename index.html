@@ -14,172 +14,151 @@
             <div class="cell">
                 <span id="pos-0-x" class="batu hidden">X</span>
                 <span id="pos-0-o" class="maru hidden">O</span>
-                <button id="pos-0-button" py-click="cell_click(0)"></button>
+                <button id="pos-0-button"></button>
             </div>
             <div class="cell">
                 <span id="pos-1-x" class="batu hidden">X</span>
                 <span id="pos-1-o" class="maru hidden">O</span>
-                <button id="pos-1-button" py-click="cell_click(1)"></button>
+                <button id="pos-1-button"></button>
             </div>
             <div class="cell">
                 <span id="pos-2-x" class="batu hidden">X</span>
                 <span id="pos-2-o" class="maru hidden">O</span>
-                <button id="pos-2-button" py-click="cell_click(2)"></button>
+                <button id="pos-2-button"></button>
             </div>
             <div class="cell">
                 <span id="pos-3-x" class="batu hidden">X</span>
                 <span id="pos-3-o" class="maru hidden">O</span>
-                <button id="pos-3-button" py-click="cell_click(3)"></button>
+                <button id="pos-3-button"></button>
             </div>
             <div class="cell">
                 <span id="pos-4-x" class="batu hidden">X</span>
                 <span id="pos-4-o" class="maru hidden">O</span>
-                <button id="pos-4-button" py-click="cell_click(4)"></button>
+                <button id="pos-4-button"></button>
             </div>
             <div class="cell">
                 <span id="pos-5-x" class="batu hidden">X</span>
                 <span id="pos-5-o" class="maru hidden">O</span>
-                <button id="pos-5-button" py-click="cell_click(5)"></button>
+                <button id="pos-5-button"></button>
             </div>
             <div class="cell">
                 <span id="pos-6-x" class="batu hidden">X</span>
                 <span id="pos-6-o" class="maru hidden">O</span>
-                <button id="pos-6-button" py-click="cell_click(idx=6)"></button>
+                <button id="pos-6-button"></button>
             </div>
             <div class="cell">
                 <span id="pos-7-x" class="batu hidden">X</span>
                 <span id="pos-7-o" class="maru hidden">O</span>
-                <button id="pos-7-button" py-click="cell_click(idx=7)"></button>
+                <button id="pos-7-button"></button>
             </div>
             <div class="cell">
                 <span id="pos-8-x" class="batu hidden">X</span>
                 <span id="pos-8-o" class="maru hidden">O</span>
-                <button id="pos-8-button" py-click="cell_click(idx=8)"></button>
+                <button id="pos-8-button"></button>
             </div>
 
             <h3 id="message"></h3>
             <button id="reset-button" class="hidden" py-click="reset()">Again</button>
         </div>
+
         <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
         <script>
             const model_path = "policy_model/model.onnx"
-
-            function take_action(obs) {
-                // return action value
-                console.log("take_action() from JS");
-                console.log(obs);
-                obs = Int32Array.from(obs);
-                const tensor_obs = new ort.Tensor('int32', obs, [1, 9]);
-                const tensor_state_ins = new ort.Tensor('float32', [0], [1]);
-                const feeds = { obs: tensor_obs, state_ins: tensor_state_ins};
-                // const results = await session.run(feeds);
-                // const action_prob = results.output.data;
-                // const action = action_prob.indexOf(Math.max(...action_prob)); // ... mean unpacking
-                action = Math.floor(Math.random() * 9);
-                return action;
-            }
-
-            async function load()
+            let session = null;
+            async function load_onnx()
             {
                 try {
-                    const session = await ort.InferenceSession.create(model_path);
+                    session = await ort.InferenceSession.create(model_path);
                     console.log("Model Loaded")
                 } catch (e) {
                     document.write(`failed to inference ONNX model: ${e}.`);
                 }
             }
-
-            async function main() {
-                try {
-                    const session = await ort.InferenceSession.create(model_path);
-
-                    const obs = Int32Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0]);
-                    const state_ins = Float32Array.from([0])
-                    const tensor_obs = new ort.Tensor('int32', obs, [1, 9]);
-                    const tensor_state_ins = new ort.Tensor('float32', state_ins, [1]);
-
-                    // prepare feeds. use model input names as keys.
-                    const feeds = { obs: tensor_obs, state_ins: tensor_state_ins};
-
-                    // feed inputs and run
-                    const results = await session.run(feeds);
-
-                    // read from results
-                    const action_prob = results.output.data;
-                    const action = action_prob.indexOf(Math.max(...action_prob)); // ... mean unpacking
-                    // document.write(`data of result tensor 'output': ${action}`);
-                    console.log(action);
-
-                } catch (e) {
-                    document.write(`failed to inference ONNX model: ${e}.`);
+            async function infer_onnx(obs) {
+                if (session == null) {
+                    await load_onnx();
                 }
+                obs = Int32Array.from(obs);
+                const tensor_obs = new ort.Tensor('int32', obs, [1, 9]);
+                const tensor_state_ins = new ort.Tensor('float32', [0], [1]);
+                const feeds = { obs: tensor_obs, state_ins: tensor_state_ins};
+                const results = await session.run(feeds);
+                const action_prob = results.output.data;
+                const action = action_prob.indexOf(Math.max(...action_prob)); // ... mean unpacking
+                return action;
             }
-
-            load()
         </script>
         <py-config>
             packages = ["numpy", "gymnasium"]
             [[fetch]]
             files = [
-                "rl/envs.py"
+                "rl/envs.py",
             ]
         </py-config>
         <py-script>
-            import asyncio
-            from js import take_action
-            from envs import TicTacToeEnv, Mark
-            def update_cells(state):
-                for i, value in enumerate(state):
-                    Element(f"pos-{i}-x").add_class("hidden")
-                    Element(f"pos-{i}-o").add_class("hidden")
-                    Element(f"pos-{i}-button").remove_class("hidden")
-                    if value == Mark.PLAYER_1:
-                        Element(f"pos-{i}-x").remove_class("hidden")
-                        Element(f"pos-{i}-button").add_class("hidden")
-                    elif value == Mark.PLAYER_2:
-                        Element(f"pos-{i}-o").remove_class("hidden")
-                        Element(f"pos-{i}-button").add_class("hidden")
+import asyncio
+import numpy as np
+from js import infer_onnx, document
+from pyodide.ffi import to_js, create_proxy
+from rl.envs import TicTacToeEnv, Mark
 
-            def display_message(value):
-                Element("message").write(value)
+async def click_cell(event):
+    idx = event.target.id.split("-")[1]
+    idx = int(idx)
 
-            def cell_click(idx):
-                # Player Turn
-                obs, _, terminated, _, _ = env.step(idx)
-                update_cells(env.state)
+    # Player Turn
+    obs, _, terminated, _, _ = env.step(idx)
+    update_cells(env.state)
 
-                if terminated:
-                    display_message("You Win!")
-                    Element("reset-button").remove_class("hidden")
-                    return
+    if terminated:
+        display_message("You Win!")
+        Element("reset-button").remove_class("hidden")
+        return
 
-                # AI Turn
-                display_message("AI Agent Turn")
-                while True:
-                    action = take_action(obs)
-                    if env.state[action] == Mark.EMPTY:
-                        break
+    # AI Turn
+    display_message("AI Agent Turn")
+    obs = to_js(np.array(obs, dtype=np.int32))
 
-                _, _, terminated, _, _ = env.step(action)
-                update_cells(env.state)
+    action = await infer_onnx(obs)
+    print(action)
 
-                if terminated:
-                    display_message("AI Agent Win!")
-                    Element("reset-button").remove_class("hidden")
-                    return
+    _, _, terminated, _, _ = env.step(action)
+    update_cells(env.state)
 
-                display_message("Your Turn")
+    if terminated:
+        display_message("AI Agent Win!")
+        Element("reset-button").remove_class("hidden")
+        return
 
-            def reset():
-                env.reset()
-                display_message("Your Turn")
-                update_cells(env.state)
-                Element("reset-button").add_class("hidden")
+    display_message("Your Turn")
 
-            env = TicTacToeEnv()
-            reset()
+def reset():
+    env.reset()
+    display_message("Your Turn")
+    update_cells(env.state)
+    Element("reset-button").add_class("hidden")
+
+def update_cells(state):
+    for i, value in enumerate(state):
+        Element(f"pos-{i}-o").add_class("hidden")
+        Element(f"pos-{i}-x").add_class("hidden")
+        Element(f"pos-{i}-button").remove_class("hidden")
+        if value == Mark.PLAYER_1:
+            Element(f"pos-{i}-o").remove_class("hidden")
+            Element(f"pos-{i}-button").add_class("hidden")
+        elif value == Mark.PLAYER_2:
+            Element(f"pos-{i}-x").remove_class("hidden")
+            Element(f"pos-{i}-button").add_class("hidden")
+
+def display_message(message):
+    Element("message").write(message)
+
+click_proxy = create_proxy(click_cell)
+for i in range(9):
+    document.getElementById(f"pos-{i}-button").addEventListener('click', click_proxy)
+
+env = TicTacToeEnv(env_config={"train": False})
+reset()
         </py-script>
-        <!-- <py-repl auto-generate="true"></py-repl> -->
-        <!-- <script src="test.js" defer></script> -->
     </body>
 </html>

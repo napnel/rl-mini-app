@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+    <head>
+        <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+        <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+        <link rel="stylesheet" href="styles.css">
+    </head>
+    <body>
+        <button id="pos-8-button">Click me!</button>
+
+        <py-script>
+            import asyncio
+            from js import document, console
+            from pyodide.ffi import create_proxy
+
+
+            async def click(event):
+                print("Clicked!")
+                await asyncio.sleep(1)
+                console.log(event)
+                print(type(event.target.id))
+                id = event.target.id.split('-')[1]
+                console.log(id)
+
+
+            async def main():
+                await asyncio.sleep(1)
+                print("Hello, world!")
+
+            async def cook_dish(dish):
+                print(f'Start cooking {dish}')
+                await asyncio.sleep(5)  # cooking time
+                print(f'{dish} is ready')
+
+            document.getElementById('pos-8-button').addEventListener('click', create_proxy(click))
+
+            # Schedule a dish to be cooked in the future
+            # ask = asyncio.ensure_future(cook_dish('Steak'))
+        </py-script>
+    </body>
+</html>
