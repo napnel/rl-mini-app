@@ -2,68 +2,33 @@
 <html lang="ja">
 
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+        <title>Othello RL</title>
         <script defer src="https://pyscript.net/latest/pyscript.js"></script>
         <link rel="stylesheet" href="styles.css">
     </head>
 
     <body>
-        <div class="container">
-        <h class="title">Tic Tac Toe RL</h>
-        <div class="grid">
-            <div class="cell">
-                <span id="pos-0-x" class="batu hidden">X</span>
-                <span id="pos-0-o" class="maru hidden">O</span>
-                <button id="pos-0-button"></button>
+        <main>
+            <h class="title">Tic Tac Toe RL</h>
+            <div id="content">
+                <table id="board"></table>
             </div>
-            <div class="cell">
-                <span id="pos-1-x" class="batu hidden">X</span>
-                <span id="pos-1-o" class="maru hidden">O</span>
-                <button id="pos-1-button"></button>
-            </div>
-            <div class="cell">
-                <span id="pos-2-x" class="batu hidden">X</span>
-                <span id="pos-2-o" class="maru hidden">O</span>
-                <button id="pos-2-button"></button>
-            </div>
-            <div class="cell">
-                <span id="pos-3-x" class="batu hidden">X</span>
-                <span id="pos-3-o" class="maru hidden">O</span>
-                <button id="pos-3-button"></button>
-            </div>
-            <div class="cell">
-                <span id="pos-4-x" class="batu hidden">X</span>
-                <span id="pos-4-o" class="maru hidden">O</span>
-                <button id="pos-4-button"></button>
-            </div>
-            <div class="cell">
-                <span id="pos-5-x" class="batu hidden">X</span>
-                <span id="pos-5-o" class="maru hidden">O</span>
-                <button id="pos-5-button"></button>
-            </div>
-            <div class="cell">
-                <span id="pos-6-x" class="batu hidden">X</span>
-                <span id="pos-6-o" class="maru hidden">O</span>
-                <button id="pos-6-button"></button>
-            </div>
-            <div class="cell">
-                <span id="pos-7-x" class="batu hidden">X</span>
-                <span id="pos-7-o" class="maru hidden">O</span>
-                <button id="pos-7-button"></button>
-            </div>
-            <div class="cell">
-                <span id="pos-8-x" class="batu hidden">X</span>
-                <span id="pos-8-o" class="maru hidden">O</span>
-                <button id="pos-8-button"></button>
+            <div id="stats" class="hide">
+                <div id="num-black"></div>
+                <h2></h2>
+                <div id="num-white"></div>
             </div>
 
             <h3 id="message"></h3>
             <button id="reset-button" class="hidden" py-click="reset()">Again</button>
-        </div>
 
+        </main>
         <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
         <script>
-            const model_path = "policy_model/model.onnx"
+            const model_path = "othello_policy/model.onnx"
             let session = null;
             async function load_onnx()
             {
@@ -75,90 +40,162 @@
                 }
             }
             async function infer_onnx(obs) {
+                console.log("infer_onnx")
                 if (session == null) {
                     await load_onnx();
+                    console.log("load_onnx");
                 }
-                obs = Int32Array.from(obs);
-                const tensor_obs = new ort.Tensor('int32', obs, [1, 9]);
+                obs = Int8Array.from(obs);
+                const tensor_obs = new ort.Tensor('int8', obs, [1, 64]);
                 const tensor_state_ins = new ort.Tensor('float32', [0], [1]);
                 const feeds = { obs: tensor_obs, state_ins: tensor_state_ins};
                 const results = await session.run(feeds);
                 const action_prob = results.output.data;
-                const action = action_prob.indexOf(Math.max(...action_prob)); // ... mean unpacking
-                return action;
+                return action_prob
+                // const action = action_prob.indexOf(Math.max(...action_prob)); // ... mean unpacking
+                // return action;
             }
         </script>
         <py-config>
             packages = ["numpy", "gymnasium"]
             [[fetch]]
             files = [
-                "rl/envs.py",
+                "rl/envs/tictactoe.py",
+                "front/othello.py"
             ]
         </py-config>
         <py-script>
+import numpy as np
+
+import gymnasium as gym
+from typing import Any, Dict, List, Optional
 import asyncio
 import numpy as np
 from js import infer_onnx, document
 from pyodide.ffi import to_js, create_proxy
-from rl.envs import TicTacToeEnv, Mark
+from front.othello import OthelloEnv
 
-async def click_cell(event):
-    idx = event.target.id.split("-")[1]
-    idx = int(idx)
+COLOR = {"agent_1": "black", "agent_2": "white"}
+BOARD = document.getElementById("board")
 
-    # Player Turn
-    obs, _, terminated, _, _ = env.step(idx)
-    update_cells(env.state)
-
-    if terminated:
-        display_message("You Win!")
-        Element("reset-button").remove_class("hidden")
-        return
-
-    # AI Turn
-    display_message("AI Agent Turn")
-    obs = to_js(np.array(obs, dtype=np.int32))
-
-    action = await infer_onnx(obs)
-    print(action)
-
-    _, _, terminated, _, _ = env.step(action)
-    update_cells(env.state)
-
-    if terminated:
-        display_message("AI Agent Win!")
-        Element("reset-button").remove_class("hidden")
-        return
-
-    display_message("Your Turn")
-
-def reset():
-    env.reset()
-    display_message("Your Turn")
-    update_cells(env.state)
-    Element("reset-button").add_class("hidden")
-
-def update_cells(state):
-    for i, value in enumerate(state):
-        Element(f"pos-{i}-o").add_class("hidden")
-        Element(f"pos-{i}-x").add_class("hidden")
-        Element(f"pos-{i}-button").remove_class("hidden")
-        if value == Mark.PLAYER_1:
-            Element(f"pos-{i}-o").remove_class("hidden")
-            Element(f"pos-{i}-button").add_class("hidden")
-        elif value == Mark.PLAYER_2:
-            Element(f"pos-{i}-x").remove_class("hidden")
-            Element(f"pos-{i}-button").add_class("hidden")
 
 def display_message(message):
-    Element("message").write(message)
+    document.getElementById("message").innerHTML = message
 
-click_proxy = create_proxy(click_cell)
-for i in range(9):
-    document.getElementById(f"pos-{i}-button").addEventListener('click', click_proxy)
+def update_board():
+    for row in range(env.board.shape[0]):
+        for col in range(env.board.shape[1]):
+            if env.board[row, col] == 0:
+                BOARD.rows[row].cells[col].style.backgroundColor = "green"
+                BOARD.rows[row].cells[col].style.opacity = 1
 
-env = TicTacToeEnv(env_config={"train": False})
+            elif env.board[row, col] == 1:
+                BOARD.rows[row].cells[col].style.backgroundColor = "black"
+                BOARD.rows[row].cells[col].style.opacity = 1
+
+            elif env.board[row, col] == -1:
+                BOARD.rows[row].cells[col].style.backgroundColor = "white"
+                BOARD.rows[row].cells[col].style.opacity = 1
+
+    show_valid_moves()
+    show_stats()
+    display_message(f"{COLOR[env.current_player]}'s turn")
+
+def show_valid_moves():
+    return
+    valid_moves = env.get_valid_moves(env.current_player)
+    for row in range(env.board.shape[0]):
+        for col in range(env.board.shape[1]):
+            if row * 8 + col in valid_moves:
+                # set to opacity and yellow
+                BOARD.rows[row].cells[col].style.backgroundColor = "yellow"
+                BOARD.rows[row].cells[col].style.opacity = 0.3
+
+def show_stats():
+    stats = env.stats
+    print(stats)
+    document.getElementById("num-black").innerHTML = f"Black: {stats['agent_1']}"
+    document.getElementById("num-white").innerHTML = f"White: {stats['agent_2']}"
+
+def finish():
+    finished = True
+    stats = env.stats
+    if stats["agent_1"] > stats["agent_2"]:
+        display_message("Black wins!")
+    elif stats["agent_1"] < stats["agent_2"]:
+        display_message("White wins!")
+    else:
+        display_message("Draw!")
+
+async def put_piece(event):
+    row, col = event.target.id.split("_")
+    row, col = int(row), int(col)
+    valid_move_idx = env.get_valid_moves(env.current_player)
+    if row * 8 + col not in valid_move_idx or finished:
+        return
+
+    # Player Turn
+    action = row * 8 + col
+    obs, _, terminated, _, _ = env.step({env.current_player: action})
+    update_board()
+    env.render()
+    print(terminated)
+
+    if terminated["__all__"]:
+        finish()
+        return
+
+    # Agent Turn
+    obs = obs[env.current_player]
+    obs = to_js(np.array(obs, dtype=np.int8))
+
+    action_prob = await infer_onnx(obs)
+    valid_move_idx = env.get_valid_moves(env.current_player)
+    action_prob = [action_prob[i] if i in valid_move_idx else 0 for i in range(64)]
+    action = np.argmax(action_prob)
+    row, col = divmod(action, 8)
+    print(row, col)
+    _, _, terminated, _, _ = env.step({env.current_player: action})
+    print(terminated)
+    update_board()
+    env.render()
+
+    if terminated["__all__"]:
+        finish()
+        return
+
+
+def create_board():
+    put_proxy = create_proxy(put_piece)
+    cells = env.board
+    for row in range(cells.shape[0]):
+        tr = document.createElement("tr")
+        for col in range(cells.shape[1]):
+            td = document.createElement("td")
+            disk = document.createElement("div")
+            disk.id = f"{row}_{col}"
+            disk.addEventListener("click", put_proxy)
+            tr.appendChild(td)
+            td.appendChild(disk)
+            td.className = "cell"
+
+        BOARD.appendChild(tr)
+
+
+def reset():
+    finished = False
+    env.reset()
+    display_message("Your Turn")
+    create_board()
+    update_board()
+    
+    # document.getElementById("reset-button").add_class("hidden")
+    Element("reset-button").add_class("hidden")
+
+finished = False
+env = OthelloEnv()
 reset()
         </py-script>
+        <!-- <script src="main.js"></script> -->
     </body>
 </html>

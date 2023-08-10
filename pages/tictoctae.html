@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+    <head>
+        <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+        <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+        <link rel="stylesheet" href="styles.css">
+    </head>
+
+    <body>
+        <div class="container">
+        <h class="title">Tic Tac Toe RL</h>
+        <div class="grid">
+            <div class="cell">
+                <span id="pos-0-x" class="batu hidden">X</span>
+                <span id="pos-0-o" class="maru hidden">O</span>
+                <button id="pos-0-button"></button>
+            </div>
+            <div class="cell">
+                <span id="pos-1-x" class="batu hidden">X</span>
+                <span id="pos-1-o" class="maru hidden">O</span>
+                <button id="pos-1-button"></button>
+            </div>
+            <div class="cell">
+                <span id="pos-2-x" class="batu hidden">X</span>
+                <span id="pos-2-o" class="maru hidden">O</span>
+                <button id="pos-2-button"></button>
+            </div>
+            <div class="cell">
+                <span id="pos-3-x" class="batu hidden">X</span>
+                <span id="pos-3-o" class="maru hidden">O</span>
+                <button id="pos-3-button"></button>
+            </div>
+            <div class="cell">
+                <span id="pos-4-x" class="batu hidden">X</span>
+                <span id="pos-4-o" class="maru hidden">O</span>
+                <button id="pos-4-button"></button>
+            </div>
+            <div class="cell">
+                <span id="pos-5-x" class="batu hidden">X</span>
+                <span id="pos-5-o" class="maru hidden">O</span>
+                <button id="pos-5-button"></button>
+            </div>
+            <div class="cell">
+                <span id="pos-6-x" class="batu hidden">X</span>
+                <span id="pos-6-o" class="maru hidden">O</span>
+                <button id="pos-6-button"></button>
+            </div>
+            <div class="cell">
+                <span id="pos-7-x" class="batu hidden">X</span>
+                <span id="pos-7-o" class="maru hidden">O</span>
+                <button id="pos-7-button"></button>
+            </div>
+            <div class="cell">
+                <span id="pos-8-x" class="batu hidden">X</span>
+                <span id="pos-8-o" class="maru hidden">O</span>
+                <button id="pos-8-button"></button>
+            </div>
+
+            <h3 id="message"></h3>
+            <button id="reset-button" class="hidden" py-click="reset()">Again</button>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+        <script>
+            const model_path = "policy_model/model.onnx"
+            let session = null;
+            async function load_onnx()
+            {
+                try {
+                    session = await ort.InferenceSession.create(model_path);
+                    console.log("Model Loaded")
+                } catch (e) {
+                    document.write(`failed to inference ONNX model: ${e}.`);
+                }
+            }
+            async function infer_onnx(obs) {
+                if (session == null) {
+                    await load_onnx();
+                }
+                obs = Int32Array.from(obs);
+                const tensor_obs = new ort.Tensor('int32', obs, [1, 9]);
+                const tensor_state_ins = new ort.Tensor('float32', [0], [1]);
+                const feeds = { obs: tensor_obs, state_ins: tensor_state_ins};
+                const results = await session.run(feeds);
+                const action_prob = results.output.data;
+                const action = action_prob.indexOf(Math.max(...action_prob)); // ... mean unpacking
+                return action;
+            }
+        </script>
+        <py-config>
+            packages = ["numpy", "gymnasium"]
+            [[fetch]]
+            files = [
+                "rl/envs.py",
+            ]
+        </py-config>
+        <py-script>
+import asyncio
+import numpy as np
+from js import infer_onnx, document
+from pyodide.ffi import to_js, create_proxy
+from rl.envs import TicTacToeEnv, Mark
+
+async def click_cell(event):
+    idx = event.target.id.split("-")[1]
+    idx = int(idx)
+
+    # Player Turn
+    obs, _, terminated, _, _ = env.step(idx)
+    update_cells(env.state)
+
+    if terminated:
+        display_message("You Win!")
+        Element("reset-button").remove_class("hidden")
+        return
+
+    # AI Turn
+    display_message("AI Agent Turn")
+    obs = to_js(np.array(obs, dtype=np.int32))
+
+    action = await infer_onnx(obs)
+    print(action)
+
+    _, _, terminated, _, _ = env.step(action)
+    update_cells(env.state)
+
+    if terminated:
+        display_message("AI Agent Win!")
+        Element("reset-button").remove_class("hidden")
+        return
+
+    display_message("Your Turn")
+
+def reset():
+    env.reset()
+    display_message("Your Turn")
+    update_cells(env.state)
+    Element("reset-button").add_class("hidden")
+
+def update_cells(state):
+    for i, value in enumerate(state):
+        Element(f"pos-{i}-o").add_class("hidden")
+        Element(f"pos-{i}-x").add_class("hidden")
+        Element(f"pos-{i}-button").remove_class("hidden")
+        if value == Mark.PLAYER_1:
+            Element(f"pos-{i}-o").remove_class("hidden")
+            Element(f"pos-{i}-button").add_class("hidden")
+        elif value == Mark.PLAYER_2:
+            Element(f"pos-{i}-x").remove_class("hidden")
+            Element(f"pos-{i}-button").add_class("hidden")
+
+def display_message(message):
+    Element("message").write(message)
+
+click_proxy = create_proxy(click_cell)
+for i in range(9):
+    document.getElementById(f"pos-{i}-button").addEventListener('click', click_proxy)
+
+env = TicTacToeEnv(env_config={"train": False})
+reset()
+        </py-script>
+    </body>
+</html>
