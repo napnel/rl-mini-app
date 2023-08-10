@@ -1,0 +1,170 @@
+import numpy as np
+
+import gymnasium as gym
+from typing import Any, Dict, List, Optional
+
+
+class OthelloEnv(gym.Env):
+    def __init__(self, config: Dict[str, Any] = None):
+        super(OthelloEnv, self).__init__()
+
+        self.agents = {"agent_1": 1, "agent_2": -1}
+        self._agent_ids = ["agent_1", "agent_2"]
+        self.action_space = gym.spaces.Discrete(8 * 8 + 1)
+        # self.obs_shape = (8, 8, 1)
+        self.obs_shape = (64,)
+        self.observation_space = gym.spaces.Box(
+            low=-1, high=1, shape=self.obs_shape, dtype=np.int8
+        )
+
+        self.current_player = "agent_1"
+        self.pass_count = {agent: 0 for agent in self.agents.keys()}
+        self.reset()
+
+    def reset(
+        self, *, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
+    ):
+        # Reset the board
+        self.board = np.zeros((8, 8), dtype=np.int8)
+        # Initial position
+        self.board[3][3] = 1
+        self.board[3][4] = -1
+        self.board[4][3] = -1
+        self.board[4][4] = 1
+        self.current_player = "agent_1"
+        self.pass_count = {agent: 0 for agent in self.agents.keys()}
+        info = {}
+        return {self.current_player: self.board.copy().reshape(*self.obs_shape)}, info
+
+    def step(self, action_dict: Dict[str, int]):
+        obs, reward, terminated, truncated, info = {}, {}, {}, {}, {}
+        # assert (
+        #     len(action_dict) == 1
+        # ), f"Only one agent can take action at a time. {action_dict}"
+        for name, action in action_dict.items():
+            row, col = divmod(action, 8)
+            agent_id = self.agents[name]
+            if action == 64:  # pass
+                if self.pass_count[name] == 1:
+                    terminated = {self.current_player: True, "__all__": True}
+                    truncated = {self.current_player: True, "__all__": True}
+                else:
+                    self.pass_count[name] = 1
+                    terminated = {self.current_player: False, "__all__": False}
+                    truncated = {self.current_player: False, "__all__": False}
+
+            elif self._is_valid_move(row, col, agent_id):
+                self._put_piece(row, col, agent_id)
+                self.pass_count[name] = 0
+                terminated = {self.current_player: False, "__all__": False}
+                truncated = {self.current_player: False, "__all__": False}
+
+            else:
+                terminated = {self.current_player: True, "__all__": True}
+                truncated = {self.current_player: True, "__all__": True}
+
+        if np.sum(self.board == 0) == 0:
+            terminated = {self.current_player: True, "__all__": True}
+
+        # Calculate the reward as the difference in the number of pieces
+        if truncated.get("__all__", False):
+            reward = {self.current_player: -15}
+        else:
+            reward = np.sum(self.board == 1) - np.sum(self.board == -1)
+            reward = reward if self.current_player == "agent_1" else -reward
+            reward = {self.current_player: reward}
+
+        self.current_player = (
+            "agent_1" if self.current_player == "agent_2" else "agent_2"
+        )
+
+        obs = {self.current_player: self.board.copy().reshape(*self.obs_shape)}
+        info = {self.current_player: {}}
+
+        return obs, reward, terminated, truncated, info
+
+    def _is_valid_move(self, row: int, col: int, agent_id: int) -> bool:
+        if row < 0 or row > 7 or col < 0 or col > 7 or self.board[row][col] != 0:
+            return False
+
+        directions = [
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+        ]
+
+        for d_row, d_col in directions:
+            r, c = row + d_row, col + d_col
+            if 0 <= r < 8 and 0 <= c < 8 and self.board[r][c] == -agent_id:
+                r += d_row
+                c += d_col
+                while 0 <= r < 8 and 0 <= c < 8 and self.board[r][c] == -agent_id:
+                    r += d_row
+                    c += d_col
+                if 0 <= r < 8 and 0 <= c < 8 and self.board[r][c] == agent_id:
+                    return True
+
+        return False
+
+    def _put_piece(self, row: int, col: int, agent_id: int) -> None:
+        self.board[row][col] = agent_id
+
+        directions = [
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+        ]
+        for d_row, d_col in directions:
+            r, c = row + d_row, col + d_col
+            to_flip = []
+            while 0 <= r < 8 and 0 <= c < 8 and self.board[r][c] == -agent_id:
+                to_flip.append((r, c))
+                r += d_row
+                c += d_col
+
+            if 0 <= r < 8 and 0 <= c < 8 and self.board[r][c] == agent_id:
+                for r_flip, c_flip in to_flip:
+                    self.board[r_flip][c_flip] = agent_id
+
+    def get_valid_moves(self, agent_name: str) -> List[int]:
+        agent_id = self.agents[agent_name]
+        valid_moves = []
+        for row in range(8):
+            for col in range(8):
+                if self._is_valid_move(row, col, agent_id):
+                    valid_moves.append(row * 8 + col)
+        return valid_moves
+
+    @property
+    def stats(self) -> Dict[str, int]:
+        return {
+            "agent_1": np.sum(self.board == 1),
+            "agent_2": np.sum(self.board == -1),
+        }
+
+    def render(self):
+        # Define the mapping from numbers to characters
+        piece_dict = {0: ".", 1: "O", -1: "X"}
+
+        # Create an empty string to store the game board
+        board_str = ""
+
+        # Iterate over the rows of the board
+        for row in self.board:
+            # Convert the row to characters and join them with '|'
+            row_str = "|".join(piece_dict[i] for i in row)
+            # Add the row string to the game board string
+            board_str += row_str + "\n"
+
+        # Print the game board string
+        print(board_str)

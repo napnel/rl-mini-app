@@ -1,4 +1,4 @@
-from enum import Enum, IntEnum
+from enum import IntEnum
 
 import gymnasium as gym
 import numpy as np
@@ -95,71 +95,3 @@ class TicTacToeEnv(gym.Env):
 
         else:
             return 0
-
-
-# class OthelloEnv(gym.Env):
-#     def __init__(self):
-#         super(OthelloEnv, self).__init__()
-
-#         # Define action and observation space
-#         self.action_space = spaces.Discrete(64)  # 8x8 board
-#         self.observation_space = spaces.Box(
-#             low=0,
-#             high=2,
-#             shape=(
-#                 8,
-#                 8,
-#             ),
-#             dtype=int,
-#         )
-
-#         # Initialize state
-#         self.state = np.zeros((8, 8), dtype=int)
-#         self.state[3, 3] = self.state[4, 4] = 1  # Player 1 initial stones
-#         self.state[3, 4] = self.state[4, 3] = 2  # Player 2 initial stones
-
-#         # Track whose turn it is, 1 for player 1, 2 for player 2
-#         self.current_player = 1
-
-#     def step(self, action):
-#         truncated = False
-#         # Execute one time step within the environment
-#         if self.is_valid_action(action):
-#             self.state = self.get_next_state(self.state, action, self.current_player)
-#             terminated = self.is_game_over()
-#             if terminated:
-#                 # Game is over, player with more stones wins
-#                 reward = 1 if np.sum(self.state == self.current_player) > 32 else -1
-#             else:
-#                 # Game continues
-#                 reward = 0
-#                 self.current_player = 1 if self.current_player == 2 else 2
-#         else:
-#             # Invalid action, game is over and the player loses
-#             terminated = True
-#             reward = -1
-
-#         return self.state, reward, terminated, truncated, {}
-
-#     def reset(self):
-#         # Reset the state of the environment to an initial state
-#         self.state = np.zeros((8, 8), dtype=int)
-#         self.state[3, 3] = self.state[4, 4] = 1
-#         self.state[3, 4] = self.state[4, 3] = 2
-#         self.current_player = 1
-#         return self.state, {}
-
-#     def is_valid_action(self, action):
-#         # Check if an action is valid or not for the current state and player
-#         # You will need to implement the rules of Othello here
-#         pass
-
-#     def get_next_state(self, state, action, player):
-#         # Get the next state by applying the action for the player
-#         # You will need to implement the rules of Othello here
-#         pass
-
-#     def is_game_over(self):
-#         # Check if the game is over or not
-#         # Game is over if the board is full, or if a player has no valid actions
-#         pass

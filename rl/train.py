@@ -1,7 +1,7 @@
 # import ray
 from ray.rllib.algorithms import ppo
 
-from rl.envs import TicTacToeEnv
+from rl.tictactoe_env import TicTacToeEnv
 
 print("Hello World! from test.py")
 
