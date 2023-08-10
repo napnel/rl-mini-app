@@ -12,7 +12,7 @@
 
     <body>
         <main>
-            <h class="title">Othello RL</h>
+            <h1 id="title">Othello RL</h1>
             <div id="game-container">
                 <div id="score-gauge-container">
                     <div id="score-gauge">
@@ -21,13 +21,18 @@
                     </div>
                     <div id="score-labels">
                         <span id="black-label"></span>
+                        <span id="score-diff"></span>
                         <span id="white-label"></span>
                     </div>
                 </div>
                 <table id="board"></table>
                 <div id="game-status">
                     <h3 id="message"></h3>
-                    <button id="reset-button" py-click="reset()">Again</button>
+                    <div id="buttons">
+                        <button id="undo-button" py-click="undo_btn()">Undo</button>
+                        <button id="pass-button" py-click="pass_btn()">Pass</button>
+                        <button id="reset-button" py-click="reset_btn()">Reset</button>
+                    </div>
                 </div>
             </div>
         </main>
@@ -60,6 +65,12 @@
                 // const action = action_prob.indexOf(Math.max(...action_prob)); // ... mean unpacking
                 // return action;
             }
+            const putSE = new Audio("assets/put_piece.mp3");
+            function se_put_piece() {
+                putSE.volume = 0.5;
+                putSE.currentTime = 0;
+                putSE.play();
+            }
         </script>
         <py-config>
             packages = ["numpy", "gymnasium"]
@@ -76,7 +87,7 @@ import gymnasium as gym
 from typing import Any, Dict, List, Optional
 import asyncio
 import numpy as np
-from js import infer_onnx, document
+from js import infer_onnx, document, se_put_piece
 from pyodide.ffi import to_js, create_proxy
 from front.othello import OthelloEnv
 
@@ -102,6 +113,7 @@ def update_board():
     show_valid_moves()
     show_stats()
     display_message(f"{COLOR[env.current_player]}'s turn")
+    se_put_piece()
 
 def show_valid_moves():
     return
@@ -118,11 +130,11 @@ def show_stats():
     total = stats["agent_1"] + stats["agent_2"]
     black_ratio = (stats["agent_1"] / total) * 100
     white_ratio = (stats["agent_2"] / total) * 100
-    print(black_ratio, white_ratio)
     document.getElementById("black-gauge").style.width = f"{black_ratio}%"
     document.getElementById("white-gauge").style.width = f"{white_ratio}%"
     document.getElementById("black-label").innerHTML = f"Black: {stats['agent_1']}"
     document.getElementById("white-label").innerHTML = f"White: {stats['agent_2']}"
+    document.getElementById("score-diff").innerHTML = f"{stats['agent_1'] - stats['agent_2']}"
 
 
 def finish():
@@ -147,7 +159,6 @@ async def put_piece(event):
     obs, _, terminated, _, _ = env.step({env.current_player: action})
     update_board()
     env.render()
-    print(terminated)
 
     if terminated["__all__"]:
         finish()
@@ -162,9 +173,7 @@ async def put_piece(event):
     action_prob = [action_prob[i] if i in valid_move_idx else 0 for i in range(64)]
     action = np.argmax(action_prob)
     row, col = divmod(action, 8)
-    print(row, col)
     _, _, terminated, _, _ = env.step({env.current_player: action})
-    print(terminated)
     update_board()
     env.render()
 
@@ -190,20 +199,22 @@ def create_board():
 
         BOARD.appendChild(tr)
 
+def pass_btn():
+    pass
 
-def reset():
+def undo_btn():
+    pass
+
+def reset_btn():
     finished = False
     env.reset()
     display_message("Your Turn")
     create_board()
     update_board()
-    
-    # document.getElementById("reset-button").add_class("hidden")
-    Element("reset-button").add_class("hidden")
 
 finished = False
 env = OthelloEnv()
-reset()
+reset_btn()
         </py-script>
         <!-- <script src="main.js"></script> -->
     </body>

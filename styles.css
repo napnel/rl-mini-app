@@ -16,7 +16,7 @@
 
 #game-status {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 30px;
 }
 
 #reset-button {
@@ -39,6 +39,7 @@
   align-items: center;
   margin-bottom: 20px;
   width: 50%;
+  height: 20%;
 }
 
 #score-gauge {
@@ -47,6 +48,26 @@
   display: flex;
   border: 2px solid #333;
   background-color: #f3f3f3;
+}
+
+#score-diff {
+  margin-top: 6px;
+  font-weight: bold;
+  font-size: 2em;
+  text-decoration: underline;
+  text-decoration-color: steelblue;
+}
+
+#black-label {
+  text-align: left;
+  margin-left: 10px;
+  font-size: 1.2em;
+}
+
+#white-label {
+  text-align: right;
+  margin-right: 10px;
+  font-size: 1.2em;
 }
 
 #black-gauge {
@@ -92,14 +113,33 @@ td.cell {
   width: 40px;
   height: 40px;
   border-radius: 50%;
+  transform-origin: center;
+  animation: putPiece 0.5s;
 }
 
 .piece.black {
   background-color: #000;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+  background: radial-gradient(circle at center, #000 30%, #333 100%);
+  transition: all 0.3s ease;
 }
 
 .piece.white {
   background-color: #fff;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+  background: radial-gradient(circle at center, #fff 30%, #aaaaaa 100%);
+  transition: all 0.3s ease;
+}
+
+@keyframes putPiece {
+  from {
+    transform: scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(360deg);
+    opacity: 1;
+  }
 }
 
 #score-labels {
@@ -115,26 +155,36 @@ td.cell {
   display: none;
 }
 
-.title {
+#title {
   font-size: 2em;
   margin: 30px 0;
+  text-align: center;
 }
 
 #message{
-  font-size: 1.2em;
+  font-size: 1.5em;
   margin: 30px 0;
+  text-decoration: underline;
+  text-decoration-color: sandybrown;
 }
 
-#reset-button {
+#buttons {
+  display: flex;
+  justify-content: space-around;
+  width: 75%;
+  margin: 20px 10;
+  padding: 10px;
+}
+
+#buttons button {
   width: 150px;
   height: 50px;
-  border: none;
-  border-radius: 5px;
+  border: #000;
+  border-radius: 10px;
   background-color:dodgerblue;
   color: white;
+  display: none;
 }
-
-
 
 #menu p {
   width: 100px;
