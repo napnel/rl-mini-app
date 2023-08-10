@@ -12,19 +12,24 @@
 
     <body>
         <main>
-            <h class="title">Tic Tac Toe RL</h>
-            <div id="content">
+            <h class="title">Othello RL</h>
+            <div id="game-container">
+                <div id="score-gauge-container">
+                    <div id="score-gauge">
+                        <div id="black-gauge" style="width: 50%;"></div>
+                        <div id="white-gauge" style="width: 50%;"></div>
+                    </div>
+                    <div id="score-labels">
+                        <span id="black-label"></span>
+                        <span id="white-label"></span>
+                    </div>
+                </div>
                 <table id="board"></table>
+                <div id="game-status">
+                    <h3 id="message"></h3>
+                    <button id="reset-button" py-click="reset()">Again</button>
+                </div>
             </div>
-            <div id="stats" class="hide">
-                <div id="num-black"></div>
-                <h2></h2>
-                <div id="num-white"></div>
-            </div>
-
-            <h3 id="message"></h3>
-            <button id="reset-button" class="hidden" py-click="reset()">Again</button>
-
         </main>
         <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
         <script>
@@ -83,19 +88,16 @@ def display_message(message):
     document.getElementById("message").innerHTML = message
 
 def update_board():
+    # Get piece of cells
     for row in range(env.board.shape[0]):
         for col in range(env.board.shape[1]):
-            if env.board[row, col] == 0:
-                BOARD.rows[row].cells[col].style.backgroundColor = "green"
-                BOARD.rows[row].cells[col].style.opacity = 1
-
-            elif env.board[row, col] == 1:
-                BOARD.rows[row].cells[col].style.backgroundColor = "black"
-                BOARD.rows[row].cells[col].style.opacity = 1
-
+            piece = BOARD.rows[row].cells[col].getElementsByClassName("piece")[0]
+            if env.board[row, col] == 1:
+                piece.className = "piece black"
             elif env.board[row, col] == -1:
-                BOARD.rows[row].cells[col].style.backgroundColor = "white"
-                BOARD.rows[row].cells[col].style.opacity = 1
+                piece.className = "piece white"
+            else:
+                piece.className = "piece"
 
     show_valid_moves()
     show_stats()
@@ -113,9 +115,15 @@ def show_valid_moves():
 
 def show_stats():
     stats = env.stats
-    print(stats)
-    document.getElementById("num-black").innerHTML = f"Black: {stats['agent_1']}"
-    document.getElementById("num-white").innerHTML = f"White: {stats['agent_2']}"
+    total = stats["agent_1"] + stats["agent_2"]
+    black_ratio = (stats["agent_1"] / total) * 100
+    white_ratio = (stats["agent_2"] / total) * 100
+    print(black_ratio, white_ratio)
+    document.getElementById("black-gauge").style.width = f"{black_ratio}%"
+    document.getElementById("white-gauge").style.width = f"{white_ratio}%"
+    document.getElementById("black-label").innerHTML = f"Black: {stats['agent_1']}"
+    document.getElementById("white-label").innerHTML = f"White: {stats['agent_2']}"
+
 
 def finish():
     finished = True
@@ -172,11 +180,12 @@ def create_board():
         tr = document.createElement("tr")
         for col in range(cells.shape[1]):
             td = document.createElement("td")
-            disk = document.createElement("div")
-            disk.id = f"{row}_{col}"
-            disk.addEventListener("click", put_proxy)
+            piece = document.createElement("div")
+            piece.id = f"{row}_{col}"
+            piece.addEventListener("click", put_proxy)
+            piece.className = "piece"
             tr.appendChild(td)
-            td.appendChild(disk)
+            td.appendChild(piece)
             td.className = "cell"
 
         BOARD.appendChild(tr)
