@@ -171,6 +171,7 @@ async def put_piece(event):
     action_prob = await infer_onnx(obs)
     action = np.argmax(action_prob)
     valid_move_idx = env.get_valid_moves(env.current_player)
+    valid_move_idx.append(64)
     if action not in valid_move_idx:
         # random select from valid moves
         action = np.random.choice(valid_move_idx)
