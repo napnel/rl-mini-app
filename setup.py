@@ -9,6 +9,7 @@ setup(
         "numpy",
         "matplotlib",
         "ray[rllib]",
+        "tensorboard",
         "black",
         "flake8",
         "ipykernel",
