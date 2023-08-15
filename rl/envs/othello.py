@@ -152,8 +152,6 @@ class OthelloEnv(MultiAgentEnv):
             "agent_2": np.sum(self.board == -1),
         }
 
-
-
     def render(self):
         # Define the mapping from numbers to characters
         piece_dict = {0: ".", 1: "O", -1: "X"}
