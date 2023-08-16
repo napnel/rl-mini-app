@@ -11,8 +11,7 @@ class OthelloEnv(MultiAgentEnv):
         self.agents = {"agent_1": 1, "agent_2": -1}
         self._agent_ids = ["agent_1", "agent_2"]
         self.action_space = gym.spaces.Discrete(8 * 8 + 1)
-        # self.obs_shape = (8, 8, 1)
-        self.obs_shape = (64,)
+        self.obs_shape = config.get("obs_shape", (64,))
         self.observation_space = gym.spaces.Box(
             low=-1, high=1, shape=self.obs_shape, dtype=np.int8
         )
@@ -38,41 +37,33 @@ class OthelloEnv(MultiAgentEnv):
 
     def step(self, action_dict: Dict[str, int]):
         obs, reward, terminated, truncated, info = {}, {}, {}, {}, {}
-        # assert (
-        #     len(action_dict) == 1
-        # ), f"Only one agent can take action at a time. {action_dict}"
+        reward = 0
+        terminated, truncated = False, False
         for name, action in action_dict.items():
             row, col = divmod(action, 8)
-            agent_id = self.agents[name]
             if action == 64:  # pass
                 if self.pass_count[name] == 1:
-                    terminated = {self.current_player: True, "__all__": True}
-                    truncated = {self.current_player: True, "__all__": True}
+                    truncated = True
                 else:
                     self.pass_count[name] = 1
-                    terminated = {self.current_player: False, "__all__": False}
-                    truncated = {self.current_player: False, "__all__": False}
 
-            elif self._is_valid_move(row, col, agent_id):
-                self._put_piece(row, col, agent_id)
+            elif self._is_valid_move(row, col, name):
+                self._put_piece(row, col, name)
                 self.pass_count[name] = 0
-                terminated = {self.current_player: False, "__all__": False}
-                truncated = {self.current_player: False, "__all__": False}
 
             else:
-                terminated = {self.current_player: True, "__all__": True}
-                truncated = {self.current_player: True, "__all__": True}
+                truncated = True
 
         if np.sum(self.board == 0) == 0:
-            terminated = {self.current_player: True, "__all__": True}
+            terminated = True
 
-        # Calculate the reward as the difference in the number of pieces
-        if truncated.get("__all__", False):
-            reward = {self.current_player: -15}
-        else:
-            reward = np.sum(self.board == 1) - np.sum(self.board == -1)
-            reward = reward if self.current_player == "agent_1" else -reward
-            reward = {self.current_player: reward}
+        terminated = {self.current_player: terminated, "__all__": terminated}
+        truncated = {self.current_player: truncated, "__all__": truncated}
+
+        reward = self._calculate_reward(
+            action_dict.get(self.current_player, 64), terminated, truncated
+        )
+        reward = {self.current_player: reward}
 
         self.current_player = (
             "agent_1" if self.current_player == "agent_2" else "agent_2"
@@ -83,10 +74,47 @@ class OthelloEnv(MultiAgentEnv):
 
         return obs, reward, terminated, truncated, info
 
-    def _is_valid_move(self, row: int, col: int, agent_id: int) -> bool:
+    def _calculate_reward(self, action: int, terminated: bool, truncated: bool):
+        # Reward for the game rule
+        win_reward = 0
+        if np.sum(self.board == 0) == 0 or terminated:
+            player_id = self.agents[self.current_player]
+            opponent_id = self.agents[self.opponent]
+            win_reward = (
+                10
+                if np.sum(self.board == player_id) > np.sum(self.board == opponent_id)
+                else -10
+            )
+
+        # if true, then the taken invalid action or two consecutive passes
+        rule_break_penalty = 0 if not truncated else -10
+
+        reward = win_reward + rule_break_penalty
+
+        # Reward against the agent's action
+        if not terminated and not truncated and action != 64:
+            corner_reward = 0
+            row, col = divmod(action, 8)
+            if (row == 0 or row == 7) and (col == 0 or col == 7):
+                corner_reward = 5
+
+            edge_reward = 0
+            if row == 0 or row == 7 or col == 0 or col == 7:
+                edge_reward = 1
+
+            restricting_opponent_actions_reward = (
+                len(self.get_valid_moves(self.opponent)) * 0.2
+            )
+
+            reward += corner_reward + edge_reward + restricting_opponent_actions_reward
+
+        return reward
+
+    def _is_valid_move(self, row: int, col: int, agent_name: str) -> bool:
         if row < 0 or row > 7 or col < 0 or col > 7 or self.board[row][col] != 0:
             return False
 
+        agent_id = self.agents[agent_name]
         directions = [
             (1, 0),
             (-1, 0),
@@ -111,7 +139,8 @@ class OthelloEnv(MultiAgentEnv):
 
         return False
 
-    def _put_piece(self, row: int, col: int, agent_id: int) -> None:
+    def _put_piece(self, row: int, col: int, agent_name: str) -> None:
+        agent_id = self.agents[agent_name]
         self.board[row][col] = agent_id
 
         directions = [
@@ -137,16 +166,19 @@ class OthelloEnv(MultiAgentEnv):
                     self.board[r_flip][c_flip] = agent_id
 
     def get_valid_moves(self, agent_name: str) -> List[int]:
-        agent_id = self.agents[agent_name]
         valid_moves = []
         for row in range(8):
             for col in range(8):
-                if self._is_valid_move(row, col, agent_id):
+                if self._is_valid_move(row, col, agent_name):
                     valid_moves.append(row * 8 + col)
         return valid_moves
 
     @property
-    def get_stats(self) -> Dict[str, int]:
+    def opponent(self) -> str:
+        return "agent_2" if self.current_player == "agent_1" else "agent_1"
+
+    @property
+    def stats(self) -> Dict[str, int]:
         return {
             "agent_1": np.sum(self.board == 1),
             "agent_2": np.sum(self.board == -1),
