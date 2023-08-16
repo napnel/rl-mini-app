@@ -5,7 +5,7 @@ from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
 
 class OthelloEnv(MultiAgentEnv):
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any]):
         super(OthelloEnv, self).__init__()
 
         self.agents = {"agent_1": 1, "agent_2": -1}

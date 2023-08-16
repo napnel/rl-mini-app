@@ -13,26 +13,31 @@
     <body>
         <main>
             <h1 id="title">オセロでAIと勝負</h1>
-            <div id="game-container">
-                <div id="score-gauge-container">
-                    <div id="score-gauge">
-                        <div id="black-gauge" style="width: 50%;"></div>
-                        <div id="white-gauge" style="width: 50%;"></div>
+            <div id="container">
+                <div id="game-container">
+                    <div id="score-gauge-container">
+                        <div id="score-gauge">
+                            <div id="black-gauge" style="width: 50%;"></div>
+                            <div id="white-gauge" style="width: 50%;"></div>
+                        </div>
+                        <div id="score-labels">
+                            <span id="black-label"></span>
+                            <span id="score-diff"></span>
+                            <span id="white-label"></span>
+                        </div>
                     </div>
-                    <div id="score-labels">
-                        <span id="black-label"></span>
-                        <span id="score-diff"></span>
-                        <span id="white-label"></span>
+                    <table id="board"></table>
+                    <div id="game-status">
+                        <h3 id="message"></h3>
+                        <div id="buttons">
+                            <button id="undo-button" py-click="undo_btn()">Undo</button>
+                            <button id="pass-button" py-click="pass_btn()">Pass</button>
+                            <button id="reset-button" py-click="reset_btn()">Reset</button>
+                        </div>
                     </div>
                 </div>
-                <table id="board"></table>
-                <div id="game-status">
-                    <h3 id="message"></h3>
-                    <div id="buttons">
-                        <button id="undo-button" py-click="undo_btn()">Undo</button>
-                        <button id="pass-button" py-click="pass_btn()">Pass</button>
-                        <button id="reset-button" py-click="reset_btn()">Reset</button>
-                    </div>
+                <div id="terminal-section">
+                    <py-terminal></py-terminal>
                 </div>
             </div>
         </main>
@@ -79,6 +84,8 @@
                 "rl/envs/tictactoe.py",
                 "front/othello.py"
             ]
+            [splashscreen]
+            enabled = true
         </py-config>
         <py-script>
 import numpy as np
@@ -98,6 +105,23 @@ BOARD = document.getElementById("board")
 def display_message(message):
     document.getElementById("message").innerHTML = message
 
+def create_board():
+    put_proxy = create_proxy(put_piece)
+    cells = env.board
+    for row in range(cells.shape[0]):
+        tr = document.createElement("tr")
+        for col in range(cells.shape[1]):
+            td = document.createElement("td")
+            piece = document.createElement("div")
+            piece.id = f"{row}_{col}"
+            piece.addEventListener("click", put_proxy)
+            piece.className = "piece"
+            tr.appendChild(td)
+            td.appendChild(piece)
+            td.className = "cell"
+
+        BOARD.appendChild(tr)
+
 def update_board():
     # Get piece of cells
     for row in range(env.board.shape[0]):
@@ -110,20 +134,9 @@ def update_board():
             else:
                 piece.className = "piece"
 
-    show_valid_moves()
     show_stats()
     display_message(f"{COLOR[env.current_player]}'s turn")
     se_put_piece()
-
-def show_valid_moves():
-    return
-    valid_moves = env.get_valid_moves(env.current_player)
-    for row in range(env.board.shape[0]):
-        for col in range(env.board.shape[1]):
-            if row * 8 + col in valid_moves:
-                # set to opacity and yellow
-                BOARD.rows[row].cells[col].style.backgroundColor = "yellow"
-                BOARD.rows[row].cells[col].style.opacity = 0.3
 
 def show_stats():
     stats = env.stats
@@ -161,48 +174,37 @@ async def put_piece(event):
     # env.render()
 
     if terminated["__all__"]:
+        print(terminated)
         finish()
         return
 
     # Agent Turn
-    obs = obs[env.current_player]
+    print(env.current_player)
+    obs = -obs[env.current_player]
     obs = to_js(np.array(obs, dtype=np.int8))
 
     action_prob = await infer_onnx(obs)
-    action = np.argmax(action_prob)
+    action_prob = action_prob.to_py()
+    action_prob = np.array(action_prob, dtype=np.float32)
+    action = np.argmax(action_prob, axis=0)
     valid_move_idx = env.get_valid_moves(env.current_player)
     valid_move_idx.append(64)
     if action not in valid_move_idx:
         # random select from valid moves
+        print("Agent take: ", action, " but invalid")
         action = np.random.choice(valid_move_idx)
+        print("Agent take: ", action, " instead")
     
-    # action = np.argmax(action_prob)
     row, col = divmod(action, 8)
     _, _, terminated, _, _ = env.step({env.current_player: action})
     update_board()
     # env.render()
 
     if terminated["__all__"]:
+        print(terminated)
         finish()
         return
 
-
-def create_board():
-    put_proxy = create_proxy(put_piece)
-    cells = env.board
-    for row in range(cells.shape[0]):
-        tr = document.createElement("tr")
-        for col in range(cells.shape[1]):
-            td = document.createElement("td")
-            piece = document.createElement("div")
-            piece.id = f"{row}_{col}"
-            piece.addEventListener("click", put_proxy)
-            piece.className = "piece"
-            tr.appendChild(td)
-            td.appendChild(piece)
-            td.className = "cell"
-
-        BOARD.appendChild(tr)
 
 def pass_btn():
     pass
@@ -218,7 +220,7 @@ def reset_btn():
     update_board()
 
 finished = False
-env = OthelloEnv()
+env = OthelloEnv({})
 reset_btn()
         </py-script>
         <!-- <script src="main.js"></script> -->
