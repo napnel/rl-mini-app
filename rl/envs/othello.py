@@ -57,13 +57,13 @@ class OthelloEnv(MultiAgentEnv):
         if np.sum(self.board == 0) == 0:
             terminated = True
 
-        terminated = {self.current_player: terminated, "__all__": terminated}
-        truncated = {self.current_player: truncated, "__all__": truncated}
-
         reward = self._calculate_reward(
             action_dict.get(self.current_player, 64), terminated, truncated
         )
         reward = {self.current_player: reward}
+
+        terminated = {self.current_player: terminated, "__all__": terminated}
+        truncated = {self.current_player: truncated, "__all__": truncated}
 
         self.current_player = (
             "agent_1" if self.current_player == "agent_2" else "agent_2"
@@ -77,17 +77,17 @@ class OthelloEnv(MultiAgentEnv):
     def _calculate_reward(self, action: int, terminated: bool, truncated: bool):
         # Reward for the game rule
         win_reward = 0
-        if np.sum(self.board == 0) == 0 or terminated:
+        if terminated:
             player_id = self.agents[self.current_player]
             opponent_id = self.agents[self.opponent]
             win_reward = (
-                10
+                100
                 if np.sum(self.board == player_id) > np.sum(self.board == opponent_id)
-                else -10
+                else -25
             )
 
         # if true, then the taken invalid action or two consecutive passes
-        rule_break_penalty = 0 if not truncated else -10
+        rule_break_penalty = 1 if not truncated else -25
 
         reward = win_reward + rule_break_penalty
 
@@ -96,17 +96,17 @@ class OthelloEnv(MultiAgentEnv):
             corner_reward = 0
             row, col = divmod(action, 8)
             if (row == 0 or row == 7) and (col == 0 or col == 7):
-                corner_reward = 5
+                corner_reward = 10
 
             edge_reward = 0
             if row == 0 or row == 7 or col == 0 or col == 7:
-                edge_reward = 1
+                edge_reward = 3
 
             restricting_opponent_actions_reward = (
-                len(self.get_valid_moves(self.opponent)) * 0.2
+                len(self.get_valid_moves(self.opponent)) * 0.1
             )
 
-            reward += corner_reward + edge_reward + restricting_opponent_actions_reward
+            reward += corner_reward + edge_reward - restricting_opponent_actions_reward
 
         return reward
 
